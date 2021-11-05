@@ -1,0 +1,58 @@
+{e1} is [explanation0_2] cause of {e2}
+{e1} is a cause of {e2}
+the [explanation1_1] of {e2} appeared after the administration [explanation1_8] {e1}
+The symptoms of {e2} appeared after the administration of {e1}
+{e2} developed [explanation2_2] {e1}
+{e2} developed after {e1}
+[explanation3_0] [explanation3_1] {e2} after [explanation3_4] treated with {e1}
+Patients developed {e2} after being treated with {e1}
+{e1} contributes indirectly [explanation4_3] {e2}
+{e1} contributes indirectly to {e2}
+{e1} has been [explanation5_3] with the development of {e2}
+{e1} has been associated with the development of {e2}
+symptoms of {e2} aba [explanation6_4] after withdrawal of {e1}
+Symptoms of {e2} abated after withdrawal of {e1}
+a greater risk [explanation7_3] {e2} was found in the {e1} group compared to [explanation7_13] placebo
+A greater risk of {e2} was found in the {e1} group compared to a placebo
+{e2} is [explanation8_2] [explanation8_3] [explanation8_4] of {e1}
+{e2} is a side effect of {e1}
+{e2} has been reported to occur [explanation9_6] {e1}
+{e2} has been reported to occur with {e1}
+{e2} has been [explanation10_3] after the administration of {e1}
+{e2} has been demonstrated after the administration of {e1}
+{e1} caused the [explanation11_3] of {e2}
+{e1} caused the appearance of {e2}
+use of {e1} can lead [explanation12_5] {e2}
+Use of {e1} can lead to {e2}
+{e1} can augment {e2}
+{e1} can augment {e2}
+{e1} [explanation14_1] increase the [explanation14_4] of {e2}
+{e1} can increase the risk of {e2}
+sy [explanation15_1] [explanation15_2] of {e2} appeared after dosage of {e1}
+Symptons of {e2} appeared after dosage of {e1}
+{e1} [explanation16_1] a chemical
+{e1} is a chemical
+{e2} is a disease
+{e2} is a disease
+{e1} [explanation18_1] used [explanation18_3] the [explanation18_5] of {e2}
+{e1} is used for the treatment of {e2}
+{e1} is known to reduce [explanation19_5] symptoms of {e2}
+{e1} is known to reduce the symptoms of {e2}
+{e1} is used for the prevention of {e2}
+{e1} is used for the prevention of {e2}
+{e1} ameliorates {e2}
+{e1} ameliorates {e2}
+{e1} induces {e2}
+{e1} induces {e2}
+{e1} causes a disease other than {e2}
+{e1} causes a disease other than {e2}
+{e1} [explanation24_1] an organ
+{e1} is an organ
+administering {e1} causes {e2} [explanation25_4] [explanation25_5] [explanation25_6]
+administering {e1} causes {e2} to worsen
+{e1} is effective for [explanation26_4] [explanation26_5] of {e2}
+{e1} is effective for the treatment of {e2}
+{e1} has an effect on {e2}
+{e1} has an effect on {e2}
+{e1} has [explanation28_2] atten [explanation28_5] effect [explanation28_7] {e2}
+{e1} has an attenuating effect on {e2}
