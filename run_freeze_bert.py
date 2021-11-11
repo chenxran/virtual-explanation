@@ -361,8 +361,8 @@ class Trainer(object):
             self.predict_dataset = REDataset(self.args, TASK2PATH[self.args.testset], explanations, self.tokenizer)
 
         self.train_loader = DataLoader(
-            Subset(self.train_dataset, list(random.sample(range(len(self.train_dataset)), int(len(self.train_dataset) * 0.4)))),  # TODO: need to change
-            # self.train_dataset, 
+            # Subset(self.train_dataset, list(random.sample(range(len(self.train_dataset)), int(len(self.train_dataset) * 0.4)))),  # TODO: need to change
+            self.train_dataset, 
             batch_size=args.batch_size, 
             shuffle=args.shuffle, 
             collate_fn=self.train_dataset.collate_fn,
