@@ -17,15 +17,15 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from tqdm import tqdm
 from transformers import (AutoConfig, AutoModel, BertConfig, BertTokenizer, BertModel,
                           AutoModelForSequenceClassification, AutoTokenizer, BertTokenizerFast,
+                          BertForSequenceClassification,
                           get_scheduler)
 
-from utils import (construct_virtual_explanation, evaluate_tacred,
+from utils import (evaluate_tacred,
                    load_explanation, replace_exp_with_random_tokens)
-
 torch.set_printoptions(profile="full")
 
 logging.basicConfig(
-    filename='logs/expbert-{}.log'.format(str(datetime.now())),
+    filename='logs/freeze-{}.log'.format(str(datetime.now())),
     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
     datefmt='%m/%d/%Y %H:%M:%S',
     level=logging.INFO)
@@ -34,10 +34,8 @@ logger = logging.getLogger(__name__)
 
 TASK2PATH = {
     "disease-train": "data/disease/train.txt",
-    "disease-dev": "data/disease/dev.txt",
     "disease-test": "data/disease/test.txt",
     "spouse-train": "data/spouse/train.txt",
-    "spouse-dev": "data/spouse/dev.txt",
     "spouse-test": "data/spouse/test.txt",
     'tacred-train': "data/tacred/train.json",
     'tacred-dev': "data/tacred/dev.json",
@@ -65,57 +63,13 @@ def print_config(config):
     logger.info("**************** MODEL CONFIGURATION ****************")
 
 
-class ExpBERT(nn.Module):
-    def __init__(self, args, exp_num):
-        super(ExpBERT, self).__init__()
-        self.args = args
-        self.exp_num = exp_num
-
-        # model_path = 'data/pretrain_models/bert' if args.task == 'spouse' else 'data/pretrain_models/scibert'
-        self.config = AutoConfig.from_pretrained(args.model)
-        self.model = AutoModel.from_pretrained(args.model, config=self.config)
-
-        self.classifier = nn.Sequential(
-            nn.Dropout(p=0.1),
-            nn.Linear(self.config.hidden_size * exp_num, self.args.num_labels),
-        )
-
-        self.criterion = nn.CrossEntropyLoss()
-    
-    def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        labels=None,
-        ):
-        
-        pooler_output = self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask, 
-            token_type_ids=token_type_ids
-        ).pooler_output
-
-        pooler_output = pooler_output.reshape(len(labels), self.exp_num * self.config.hidden_size).contiguous()
-        logits = self.classifier(pooler_output)
-
-        loss = self.criterion(logits, labels)
-
-        return {
-            "loss": loss, 
-            "logits": logits,
-        }
-
-    def resize_token_embeddings(self, length):
-        self.model.resize_token_embeddings(length)
-
-
 class REDataset(Dataset):
     def __init__(self, args, path, explanations, tokenizer):
         super(REDataset, self).__init__()
         self.args = args
         self.tokenizer = tokenizer
         self.explanations = explanations
+        
         self.sentences = []
         self.labels = []
         self.entities = []
@@ -148,7 +102,6 @@ class REDataset(Dataset):
         }
     
     def collate_fn(self, batch):
-        outputs = {}
         labels = []
         sentence1 = []
         sentence2 = []
@@ -182,12 +135,6 @@ class REDataset(Dataset):
                 return_tensors="pt",
             )
 
-        # check_sentences1 = self.tokenizer.batch_decode(outputs['input_ids'])
-        
-        # with open('check_input_sentence.txt', 'w') as f:
-        #     for i in range(len(check_sentences1)):
-        #         f.write(check_sentences1[i] + '\n')
-
         outputs['labels'] = torch.tensor(labels)
         return outputs
 
@@ -205,15 +152,16 @@ class REDataset(Dataset):
 
 class TACREDDataset(Dataset):
     def __init__(self, args, path, explanations, tokenizer, label2id):
-        super(TACREDDataset, self).__init__()
-        self.label2id = label2id
+        super(Dataset, self).__init__()
         self.args = args
         self.tokenizer = tokenizer
         self.explanations = explanations
+        
         self.sentences = []
         self.labels = []
         self.entities = []
-        self.positions = []
+
+        self.label2id = label2id
 
         self.load(path)
 
@@ -228,11 +176,11 @@ class TACREDDataset(Dataset):
                 entity2 = example['ents'][1][0]
                 position2 = (example['ents'][1][1], example['ents'][1][2])
 
-
+                # sentence = self.process_target_sentence(sentence, [position1, position2])
+                
                 self.labels.append(self.label2id[label])
                 self.sentences.append(sentence)
                 self.entities.append([entity1, entity2])
-                self.positions.append([position1, position2])
 
         logger.info("Number of Example in {}: {}".format(path, str(len(self.labels))))
 
@@ -244,48 +192,43 @@ class TACREDDataset(Dataset):
             'sentence': self.sentences[index],
             'entity': self.entities[index],
             'labels': self.labels[index],
-            'position': self.positions[index],
         }
     
     def collate_fn(self, batch):
+        labels = []
+        sentence1 = []
+        sentence2 = []
         if self.args.explanation:
-            sentence1 = []
-            sentence2 = []
-            label = []
             for ex in batch:
                 for exp in self.explanations:
                     exp = self.insert_entity(exp, ex['entity'])
-                    # sentence1.append(ex['sentence'])
-                    sentence1.append(self.process_target_sentence(ex['sentence'], ex['position']))
+                    sentence1.append(ex['sentence'])
                     sentence2.append(exp)
-                label.append(ex['labels'])
+                labels.append(ex['labels'])
 
             outputs = self.tokenizer(
                 sentence1, sentence2,
                 add_special_tokens=True,
                 padding="longest",
                 truncation=True,
-                max_length=256,
+                max_length=512,
                 return_tensors="pt",
             )
-            outputs['labels'] = torch.tensor(label)
         else:
-            sentence = []
-            labels = []
             for ex in batch:
-                sentence.append(self.process_target_sentence(ex['sentence'], ex['position']))
+                sentence1.append(ex['sentence'])
                 labels.append(ex['labels'])
             
             outputs = self.tokenizer(
-                sentence,
+                sentence1,
                 add_special_tokens=True,
                 padding="longest",
                 truncation=True,
-                max_length=256,
+                max_length=512,
                 return_tensors="pt",
             )
-            outputs['labels'] = torch.tensor(labels)
 
+        outputs['labels'] = torch.tensor(labels)
         return outputs
 
     def insert_entity(self, exp, entities):
@@ -298,72 +241,112 @@ class TACREDDataset(Dataset):
             exp = exp.replace('{e2}', entities[1])
 
         return exp
-    
-    def process_target_sentence(self, sentence, positions):
-        return ' @ '.join([sentence[:positions[0][0]], sentence[positions[0][0]:positions[0][1]], sentence[positions[0][1]:positions[1][0]], sentence[positions[1][0]:positions[1][1]], sentence[positions[1][1]:]])
 
+    # def process_target_sentence(self, sentence, positions):
+    #     return ' @ '.join([sentence[:positions[0][0]], sentence[positions[0][0]:positions[0][1]], sentence[positions[0][1]:positions[1][0]], sentence[positions[1][0]:positions[1][1]], sentence[positions[1][1]:]])
+
+
+class Classifier(nn.Module):
+    def __init__(self, args, config):
+        super(Classifier, self).__init__()
+        self.args = args
+        self.config = config
+        
+        if not args.mannual_exp: # -0.028 0.0427
+            self.embedding = nn.Parameter(torch.normal(mean=-0.028, std=0.0427, size=(args.exp_num * args.num_explanation_tokens * 3, config.hidden_size)))  # (args.exp_num * args.num_explanation_tokens * 3, config.hidden_size))
+        
+        if args.projection_dim == 0:
+            self.projection_dim = config.hidden_size
+            self.projection_layer = lambda x: x
+        else:
+            self.projection_dim = args.projection_dim
+            self.projection_layer = nn.Sequential(
+                nn.Linear(config.hidden_size, args.projection_dim),
+                # nn.ReLU(),
+            )
+        
+        if args.num_layers == 1:
+            self.classifier = nn.Sequential(
+                nn.Linear(self.projection_dim * args.exp_num, args.hidden_dim),
+                nn.Dropout(p=args.dropout),
+                nn.ReLU(),
+                nn.Linear(args.hidden_dim, args.num_labels),
+            )
+        else:
+            self.classifier = nn.Sequential(
+                # nn.Dropout(p=args.dropout),
+                nn.Linear(self.projection_dim * args.exp_num, args.num_labels),
+            )
+
+        self.criterion = nn.CrossEntropyLoss()
+    
+    def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, labels=None, encoder=None, fake_exp_id=None):
+        # print(input_ids)
+        if not args.mannual_exp:
+            inputs_embeds = encoder.get_input_embeddings()(input_ids)
+            inputs_embeds[input_ids == fake_exp_id, :] = self.embedding.repeat(len(labels), 1, 1).view(-1, self.config.hidden_size)
+            pooler_output = encoder(inputs_embeds=inputs_embeds, attention_mask=attention_mask, token_type_ids=token_type_ids).pooler_output
+        else:
+            with torch.no_grad():
+                pooler_output = encoder(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids).pooler_output
+        pooler_output = self.projection_layer(pooler_output).reshape(len(labels), self.args.exp_num * (args.projection_dim if args.projection_dim != 0 else 768)).contiguous()
+        logits = self.classifier(pooler_output.cuda())
+        loss = self.criterion(logits, labels)
+
+        return {
+            "loss": loss, 
+            "logits": logits,
+        }
+
+    def resize_token_embeddings(self, length):
+        self.model.resize_token_embeddings(length)
+
+
+def construct_virtual_explanation(exp_num=10, num_explanation_tokens=4):
+    texts = []
+    for i in range(exp_num):
+        a = ' '.join(["<exp>".format(j) for j in range(3 * i * num_explanation_tokens, (3 * i + 1) * num_explanation_tokens)])
+        b = ' '.join(["<exp>".format(j) for j in range((3 * i + 1) * num_explanation_tokens, (3 * i + 2) * num_explanation_tokens)])
+        c = ' '.join(["<exp>".format(j) for j in range((3 * i + 2) * num_explanation_tokens, (3 * i + 3) * num_explanation_tokens)])
+        texts.append(' <mask> '.join([a, b, c]))
+    return texts
 
 
 class Trainer(object):
     def __init__(self, args, seed, checkpoint=None):
         self.args = args
-        self.seed = seed 
+        self.seed = seed
         print_config(args)
-
-        if args.task == 'tacred':
-            explanations = []
-            for i, exp in enumerate(load_explanation(args.task)):
-                if i % 3 == 0:
-                    explanations.append(exp)
-        else:
-            explanations = load_explanation(args.task)
+        # args.exp_num = 1
+        explanations = construct_virtual_explanation(args.exp_num, args.num_explanation_tokens) # if not args.mannual_exp else load_explanation(args.task)
+        # if len(explanations) != args.exp_num:
+        #     explanations = explanations[:args.exp_num]
 
         # if checkpoint given, load checkpoint
         # this is used when running tacred task since we need to evaluate on test dataset.
         if args.explanation:
-            self.model = ExpBERT(args, len(explanations)).cuda()
+            model_path = 'data/pretrain_models/scibert' if args.task == 'disease' else '/data/chenxingran/explanation/data/pretrain_models/bert'
+            config = BertConfig.from_pretrained(model_path)
+            self.encoder = BertModel.from_pretrained(model_path, config=config)
+            self.encoder.cuda()
+            self.encoder.eval()
+            self.model = Classifier(args, config)
+            self.model.cuda()
         else:
-            config = AutoConfig.from_pretrained(args.model)
+            config = BertConfig.from_pretrained(args.model)
             config.num_labels = args.num_labels
-            self.model = AutoModelForSequenceClassification.from_pretrained(args.model, config=config).cuda()
+            model_path = 'data/pretrain_models/scibert' if args.task == 'disease' else 'data/pretrain-models/bert'
+            self.model = BertForSequenceClassification.from_pretrained(model_path, config=config).cuda()
 
         if checkpoint:
             self.model.load_state_dict(torch.load(checkpoint))
 
         self.tokenizer = BertTokenizerFast.from_pretrained(self.args.model)
 
-        base_tokenizer_length = len(self.tokenizer)
-        if args.explanation:
-            self.tokenizer.add_special_tokens({"additional_special_tokens": ['{e1}', '{e2}']})
-            def replace_exp_with_random_tokens(explanations, tokenizer, base_tokenizer_length, replace_ratio, replace_with_new_token):
-                for i, exp in enumerate(explanations):
-                    ids = torch.tensor(tokenizer(exp, add_special_tokens=False)['input_ids'])
-
-                    probability_matrix = torch.full(ids.shape, replace_ratio)
-                    special_tokens_mask = torch.tensor([id in tokenizer.all_special_ids for id in ids])
-                    
-                    probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
-                    random_indices = torch.bernoulli(probability_matrix).bool()
-
-                    if not replace_with_new_token:
-                        random_words = torch.randint(base_tokenizer_length, size=ids.size()).long()
-                    else:
-                        random_words = torch.arange(len(self.tokenizer), len(self.tokenizer) + len(ids))
-                        self.tokenizer.add_tokens(["[explanation{}_{}]".format(i, j) for j in range(len(random_words))])
-
-                    ids[random_indices] = random_words[random_indices]
-                    explanations[i] = tokenizer.decode(ids)
-                
-                return explanations
-
-            explanations = replace_exp_with_random_tokens(copy.deepcopy(explanations), self.tokenizer, base_tokenizer_length, args.replace_ratio, args.replace_with_new_token)
-
-            # with open('check.txt', 'w') as f:
-            #     for i, exp in enumerate(masked_explanations):
-            #         f.write(exp + '\n')
-            #         f.write(explanations[i] + '\n')
-
-            # self.model.resize_token_embeddings(len(self.tokenizer))
+        if args.explanation and not args.mannual_exp:
+            self.tokenizer.add_special_tokens({'additional_special_tokens': ['<exp>']})
+            self.fake_exp_id = self.tokenizer.convert_tokens_to_ids('<exp>')
+            self.encoder.resize_token_embeddings(len(self.tokenizer))
 
         if args.task == 'tacred':
             with open('data/tacred/label2id.json', 'r', encoding='utf-8') as file:
@@ -378,8 +361,8 @@ class Trainer(object):
             self.predict_dataset = REDataset(self.args, TASK2PATH[self.args.testset], explanations, self.tokenizer)
 
         self.train_loader = DataLoader(
-            self.train_dataset,
-            # Subset(self.train_dataset, list(range(500))),  # TODO: need to be changed # self.train_dataset,
+            Subset(self.train_dataset, list(random.sample(range(len(self.train_dataset)), int(len(self.train_dataset) * 0.4)))),  # TODO: need to change
+            # self.train_dataset, 
             batch_size=args.batch_size, 
             shuffle=args.shuffle, 
             collate_fn=self.train_dataset.collate_fn,
@@ -397,11 +380,28 @@ class Trainer(object):
             shuffle=args.shuffle, 
             collate_fn=self.predict_dataset.collate_fn,
         )
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
 
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.args.learning_rate)
+        self.train_iterator = []
+        with tqdm(total=len(self.train_loader)) as pbar:
+            for examples in self.train_loader:
+                self.train_iterator.append(examples)
+                pbar.update(1)
+                
+        self.eval_iterator = []
+        with tqdm(total=len(self.eval_loader)) as pbar:
+            for examples in self.eval_loader:
+                self.eval_iterator.append(examples)
+                pbar.update(1)
 
-        self.train_iterator = self.train_loader  # [examples for examples in self.train_loader]
-        self.eval_iterator = self.eval_loader  # [examples for examples in self.eval_loader]
+        # num_update_steps_per_epoch = math.ceil(len(self.train_loader) / args.gradient_accumulation_steps)
+        # max_train_steps = args.epochs * num_update_steps_per_epoch
+        # self.lr_scheduler = get_scheduler(
+        #     name="linear",
+        #     optimizer=self.optimizer,
+        #     num_warmup_steps=args.warmup_steps,
+        #     num_training_steps=max_train_steps,
+        # )
 
     def compute_metrics(self, labels, predictions):
         accuracy = accuracy_score(y_pred=predictions, y_true=labels)
@@ -433,30 +433,29 @@ class Trainer(object):
                         examples[k] = v.cuda()
                     # check sentence
                     # check_sentence = self.tokenizer.batch_decode(examples['input_ids'])
-                    # with open('check_sentence_tacred.txt', 'w') as f:
-                    #     for i, check in enumerate(check_sentence):
-                    #         f.write(check + '\n')
+                    # with open('check_sentence.txt', 'a', encoding='utf-8') as file:
+                    #     for sent in check_sentence:
+                    #         file.write(sent + '\n')
 
-                    outputs = self.model(**examples)
-                    # print(outputs['loss'])
+                    outputs = self.model(**examples, encoder=self.encoder, fake_exp_id=self.fake_exp_id if not args.mannual_exp else None)
                     (outputs["loss"] / self.args.gradient_accumulation_steps).backward()
                     losses.append(outputs['loss'].item())
                     if step % self.args.gradient_accumulation_steps == 0 or step == len(self.train_loader) - 1:
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 10.0)
                         self.optimizer.step()
                         # self.lr_scheduler.step()
                         self.optimizer.zero_grad()
+
                     pbar.set_description("Training Loss: {}".format(round(np.mean(losses[-30:]), 4)))
                     pbar.update(1)
-
             accuracy, f1 = self.evaluate(e)
             all_accuracy.append(accuracy)
             all_f1.append(f1)
-            # if all_f1[-1] == np.max(all_f1):
+            if all_f1[-1] == np.max(all_f1):
                 # make dir:
-                # if not os.path.exists('cache/{}/'.format(args.task)):
-                    # os.makedirs('cache/{}/'.format(args.task))
-                # torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
+                if not os.path.exists('cache/{}/'.format(args.task)):
+                    os.makedirs('cache/{}/'.format(args.task))
+                torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
 
         logger.info('Evaluation Result on valid set: Accuracy: {} | F1-score: {}'.format(round(np.max(all_accuracy), 4), round(np.max(all_f1), 4)))
 
@@ -475,7 +474,7 @@ class Trainer(object):
         #     for step, examples in enumerate(self.predict_loader):
         #         for k, v in examples.items():
         #             examples[k] = v.cuda()
-        #         outputs = self.model(**examples)
+        #         outputs = self.model(**examples, encoder=self.encoder, fake_exp_id=self.fake_exp_id)
         #         predictions.extend(torch.argmax(outputs['logits'], dim=1).cpu().numpy())
         #         labels.extend(examples['labels'].cpu().numpy())
         
@@ -491,8 +490,8 @@ class Trainer(object):
                 for step, examples in enumerate(self.eval_iterator):
                     for k, v in examples.items():
                         examples[k] = v.cuda()
-                    outputs = self.model(**examples)
-                    predictions.extend(torch.argmax(outputs['logits'], dim=1).cpu().numpy())
+                    outputs = self.model(**examples, encoder=self.encoder, fake_exp_id=self.fake_exp_id if not args.mannual_exp else None)
+                    predictions.extend(torch.argmax(outputs['logits'], dim=1).tolist())
                     labels.extend(examples['labels'].cpu().numpy())
 
                     pbar.update(1)
@@ -509,33 +508,72 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
     parser.add_argument("--learning_rate", type=float, default=2e-5)
-    parser.add_argument("--shuffle", type=bool, default=False)
+    parser.add_argument("--shuffle", type=bool, default=True)
     parser.add_argument("--warmup_steps", type=float, default=500)
     parser.add_argument("--epochs", type=int, default=5)
 
     parser.add_argument("--task", type=str, default="tacred")
     
-    parser.add_argument("--replace_ratio", type=float, default=0)
-    parser.add_argument("--replace_with_new_token", type=bool, default=False)
+    parser.add_argument("--mannual_exp", type=bool, default=False)
+    parser.add_argument("--num_explanation_tokens", type=int, default=4)
     parser.add_argument("--exp_num", type=int, default=1)
     parser.add_argument("--explanation", type=bool, default=False)
+    parser.add_argument("--dropout", type=float, default=0.3)
+    parser.add_argument("--projection_dim", type=int, default=64)
+    parser.add_argument("--hidden_dim", type=int, default=256)
+    parser.add_argument("--num_layers", type=int, default=1)
+
+
+
 
 
     args = parser.parse_args()
 
     args.trainset = args.task + '-train'
-    args.evalset = args.task + '-test'
+    args.evalset = args.task + '-test'  # we directly evaluate on test set since we do not search hyper parameters.
     args.testset = args.task + '-test'
 
     args.num_labels = 42 if args.task == 'tacred' else 2
+    # args.shuffle = True if args.task == 'tacred' else False
 
-    if (args.exp_num > 1 or args.replace_ratio > 0) and not args.explanation:
+    if (args.exp_num > 1 or args.mannual_exp) and not args.explanation:
         raise ValueError('You should use explanation mode.')
+    
+    if args.mannual_exp:
+        if args.task == 'disease':
+            args.exp_num = 29
+        elif args.task == 'spouse':
+            args.exp_num = 41
+        elif args.task == 'tacred':
+            raise ValueError('--mannual_exp should be False when --task == tacred since mannual explanations for tacred were not released by ExpBERT.')
 
-    if args.task == 'tacred':
-        args.shuffle = True
+    if args.task == 'disease':
+        args.model = 'allenai/scibert_scivocab_uncased'
+
     # repeat experiment five times
-    for seed in range(12, 17):
+    for seed in range(42, 47):
         set_random_seed(seed)
         trainer = Trainer(args, seed)
         trainer.train()
+    # logger.info("Hyper Params Search")
+    # for projection_dim in [64, 768]:
+    #     for gradient_accumulation_steps in [1, 4]:
+    #         for num_layers in [0, 1]:
+    #             for hidden_dim in [64, 256]:
+    #                 if num_layers == 0 and hidden_dim == 256:
+    #                     continue
+    #                 else:
+    #                     for dropout in [0.0, 0.3]:
+    #                         if num_layers == 0 and dropout == 0.3:
+    #                             continue
+    #                         else:
+    #                             # log the hyper params
+    #                             logger.info("projection_dim: {}, gradient_accumulation_steps: {}, num_layers: {}, hidden_dim: {}, dropout: {}".format(projection_dim, gradient_accumulation_steps, num_layers, hidden_dim, dropout))
+    #                             set_random_seed(42)
+    #                             args.projection_dim = projection_dim
+    #                             args.hidden_dim = hidden_dim
+    #                             args.dropout = dropout
+    #                             args.num_layers = num_layers
+    #                             trainer = Trainer(args, 42)
+    #                             trainer.train()
+
