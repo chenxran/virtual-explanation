@@ -32,15 +32,18 @@
 
 # CUDA_VISIBLE_DEVICES=0 python analysis_new.py --trainset spouse-train --testset spouse-test --task spouse --replace_ratio 0 --batch_size 32 --replace_with_new_token True
 
-CUDA_VISIBLE_DEVICES=6 python run_freeze_bert.py \
---task disease \
---batch_size 32 \
---learning_rate 1e-3 \
---explanation True \
---exp_num 1 \
---num_explanation_tokens 4 \
---epochs 30 \
---dropout 0.0 \
---projection_dim 768 \
---hidden_dim 256 \
---num_layers 0
+# CUDA_VISIBLE_DEVICES=6 python run_freeze_bert.py \
+# --task disease \
+# --batch_size 32 \
+# --learning_rate 1e-3 \
+# --explanation True \
+# --exp_num 1 \
+# --num_explanation_tokens 4 \
+# --epochs 30 \
+# --dropout 0.0 \
+# --projection_dim 768 \
+# --hidden_dim 256 \
+# --num_layers 0
+
+CUDA_VISIBLE_DEVICES=6 python freeze_analysis.py --task disease --batch_size 32 --learning_rate 1e-3 --explanation True --replace_ratio 0.5 --epochs 30 --dropout 0.0 --projection_dim 768 --hidden_dim 256 --num_layers 0
+CUDA_VISIBLE_DEVICES=7 python freeze_analysis.py --task disease --batch_size 32 --learning_rate 1e-3 --explanation True --replace_ratio 1.0 --epochs 30 --dropout 0.0 --projection_dim 768 --hidden_dim 256 --num_layers 0
