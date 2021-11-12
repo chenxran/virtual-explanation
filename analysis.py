@@ -265,7 +265,7 @@ class TACREDDataset(Dataset):
                 add_special_tokens=True,
                 padding="longest",
                 truncation=True,
-                max_length=256,
+                max_length=128, # 256,
                 return_tensors="pt",
             )
             outputs['labels'] = torch.tensor(label)
@@ -281,7 +281,7 @@ class TACREDDataset(Dataset):
                 add_special_tokens=True,
                 padding="longest",
                 truncation=True,
-                max_length=256,
+                max_length=128, # 256,
                 return_tensors="pt",
             )
             outputs['labels'] = torch.tensor(labels)
@@ -310,13 +310,13 @@ class Trainer(object):
         self.seed = seed 
         print_config(args)
 
-        if args.task == 'tacred':
-            explanations = []
-            for i, exp in enumerate(load_explanation(args.task)):
-                if i % 3 == 0:
-                    explanations.append(exp)
-        else:
-            explanations = load_explanation(args.task)
+        # if args.task == 'tacred':  # TODO: delete
+        #     explanations = []
+        #     for i, exp in enumerate(load_explanation(args.task)):
+        #         if i % 3 == 0:
+        #             explanations.append(exp)
+        # else:
+        explanations = load_explanation(args.task)
 
         # if checkpoint given, load checkpoint
         # this is used when running tacred task since we need to evaluate on test dataset.

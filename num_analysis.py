@@ -383,9 +383,9 @@ class Trainer(object):
         all_accuracy = []
         all_f1 = []
 
-        accuracy, f1 = self.evaluate(-1)
-        all_accuracy.append(accuracy)
-        all_f1.append(f1)
+        # accuracy, f1 = self.evaluate(-1)
+        # all_accuracy.append(accuracy)
+        # all_f1.append(f1)
 
         # start training
         for e in range(self.args.epochs):

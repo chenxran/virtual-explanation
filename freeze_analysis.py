@@ -339,7 +339,7 @@ class Trainer(object):
             explanations, num_explanation_tokens = replace_exp_with_random_tokens(copy.deepcopy(explanations), self.tokenizer, base_tokenizer_length, args.replace_ratio, args.replace_with_new_token)
 
         # check explanation
-        # with open('check_exp', 'w') as f:
+        # with open('replace_1.0_exp_spouse.txt', 'w') as f:
         #     for exp in explanations:
         #         f.write(exp + '\n')
 
