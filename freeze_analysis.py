@@ -338,8 +338,13 @@ class Trainer(object):
 
             explanations, num_explanation_tokens = replace_exp_with_random_tokens(copy.deepcopy(explanations), self.tokenizer, base_tokenizer_length, args.replace_ratio, args.replace_with_new_token)
 
+        logger.info("******************** Explanations ********************")
+        for exp in explanations:
+            logger.info(exp)
+        
+        logger.info("******************** Explanations ********************")
         # check explanation
-        # with open('replace_1.0_exp_spouse.txt', 'w') as f:
+        # with open('replace_{}_exp_{}.txt'.format(args.replace_ratio, args.task), 'w') as f:
         #     for exp in explanations:
         #         f.write(exp + '\n')
 
@@ -450,13 +455,15 @@ class Trainer(object):
             accuracy, f1 = self.evaluate(e)
             all_accuracy.append(accuracy)
             all_f1.append(f1)
-            if all_f1[-1] == np.max(all_f1):
-                # make dir:
-                if not os.path.exists('cache/{}/'.format(args.task)):
-                    os.makedirs('cache/{}/'.format(args.task))
-                torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
+            # if all_f1[-1] == np.max(all_f1):
+            #     # make dir:
+            #     if not os.path.exists('cache/{}/'.format(args.task)):
+            #         os.makedirs('cache/{}/'.format(args.task))
+            #     torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
 
         logger.info('Evaluation Result on valid set: Accuracy: {} | F1-score: {}'.format(round(np.max(all_accuracy), 4), round(np.max(all_f1), 4)))
+        return np.max(all_f1)
+
 
     def evaluate(self, epoch):
         self.model.eval()
@@ -517,8 +524,12 @@ if __name__ == "__main__":
     if args.task == 'disease':
         args.model = 'allenai/scibert_scivocab_uncased'
 
+    results = []
     # repeat experiment five times
     for seed in range(42, 45):
         set_random_seed(seed)
         trainer = Trainer(args, seed)
-        trainer.train()
+        results.append(trainer.train())
+    
+    logger.info('Average F1-score: {}'.format(round(np.mean(results), 4)))
+    logger.info('Standard Deviation: {}'.format(round(np.std(results), 4)))

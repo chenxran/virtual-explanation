@@ -322,6 +322,12 @@ class Trainer(object):
         # if len(explanations) != args.exp_num:
         #     explanations = explanations[:args.exp_num]
 
+        logger.info("******************** Explanations ********************")
+        for exp in explanations:
+            logger.info(exp)
+        
+        logger.info("******************** Explanations ********************")
+
         # if checkpoint given, load checkpoint
         # this is used when running tacred task since we need to evaluate on test dataset.
         if args.explanation:
@@ -458,7 +464,7 @@ class Trainer(object):
                 torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
 
         logger.info('Evaluation Result on valid set: Accuracy: {} | F1-score: {}'.format(round(np.max(all_accuracy), 4), round(np.max(all_f1), 4)))
-
+        return np.max(all_f1)
 
 
         # predict on test set
@@ -550,11 +556,15 @@ if __name__ == "__main__":
     if args.task == 'disease':
         args.model = 'allenai/scibert_scivocab_uncased'
 
+    results = []
     # repeat experiment five times
     for seed in range(42, 47):
         set_random_seed(seed)
         trainer = Trainer(args, seed)
-        trainer.train()
+        results.append(trainer.train())
+    
+    logger.info('Average F1-score: {}'.format(np.mean(results)))
+    logger.info('Std F1-score: {}'.format(np.std(results)))
     # logger.info("Hyper Params Search")
     # for projection_dim in [64, 768]:
     #     for gradient_accumulation_steps in [1, 4]:

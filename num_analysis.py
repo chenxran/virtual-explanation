@@ -299,16 +299,21 @@ class Trainer(object):
 
         if args.mannual_exp:
             if args.task == 'tacred':
-                explanations = load_explanation(args.task)[:10]
-                # explanations = []
-                # for i, exp in enumerate(load_explanation(args.task)):
-                    # if i % 3 == 0:
-                        # explanations.append(exp)
+                # explanations = load_explanation(args.task)[:10]
+                explanations = []
+                for i, exp in enumerate(load_explanation(args.task)):
+                    if i % 3 == 0:
+                        explanations.append(exp)
             else:
                 explanations = load_explanation(args.task)
         else:
             explanations = construct_virtual_explanation(args.exp_num, args.num_explanation_tokens)
 
+        logger.info("******************** Explanations ********************")
+        for exp in explanations:
+            logger.info(exp)
+        
+        logger.info("******************** Explanations ********************")
         # if checkpoint given, load checkpoint
         # this is used when running tacred task since we need to evaluate on test dataset.
         if args.explanation:
@@ -326,7 +331,6 @@ class Trainer(object):
         base_tokenizer_length = len(self.tokenizer)
         if args.explanation and not args.mannual_exp:
             self.tokenizer.add_tokens(["[explanation{}]".format(i) for i in range(3 * args.exp_num * args.num_explanation_tokens)])
-            self.model.resize_token_embeddings(len(self.tokenizer))
 
         if args.task == 'tacred':
             with open('data/tacred/label2id.json', 'r', encoding='utf-8') as file:
@@ -342,6 +346,10 @@ class Trainer(object):
         
         # only use a subset of training data
         self.subset_train_dataset = Subset(self.train_dataset, random.sample(range(len(self.train_dataset)), int(len(self.train_dataset) * args.ratio_train_samples)))  # list(range(len(self.train_dataset) * args.ratio_train_samples))))
+
+        if args.explanation and not args.mannual_exp:
+            self.model.resize_token_embeddings(len(self.tokenizer))
+            self.model.model.embeddings.word_embeddings.weight.data[base_tokenizer_length:] = torch.normal(mean=-0.028, std=0.0427, size=(len(self.tokenizer) - base_tokenizer_length, self.model.model.embeddings.word_embeddings.weight.shape[1]))
 
         self.train_loader = DataLoader(
             self.subset_train_dataset, 
@@ -415,14 +423,14 @@ class Trainer(object):
             accuracy, f1 = self.evaluate(e)
             all_accuracy.append(accuracy)
             all_f1.append(f1)
-            if all_f1[-1] == np.max(all_f1):
-                # make dir:
-                if not os.path.exists('cache/{}/'.format(args.task)):
-                    os.makedirs('cache/{}/'.format(args.task))
-                torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
+            # if all_f1[-1] == np.max(all_f1):
+            #     # make dir:
+            #     if not os.path.exists('cache/{}/'.format(args.task)):
+            #         os.makedirs('cache/{}/'.format(args.task))
+            #     torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
 
         logger.info('Evaluation Result on valid set: Accuracy: {} | F1-score: {}'.format(round(np.max(all_accuracy), 4), round(np.max(all_f1), 4)))
-
+        return np.max(all_f1)
         # # predict on test set
         # try:
         #     self.model.load_state_dict(torch.load('cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed)))
@@ -493,9 +501,13 @@ if __name__ == "__main__":
     if args.exp_num > 1 and not args.explanation:
         raise ValueError('You should use explanation mode.')
     
+    results = []
     # repeat experiment five times
     for seed in range(42, 45):
         args.seed = seed
         set_random_seed(args.seed)
         trainer = Trainer(args, args.seed)
-        trainer.train()
+        results.append(trainer.train())
+    
+    logger.info('Average F1-score: {}'.format(np.mean(results)))
+    logger.info('Standard Deviation: {}'.format(np.std(results)))

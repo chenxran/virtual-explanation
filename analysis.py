@@ -19,13 +19,12 @@ from transformers import (AutoConfig, AutoModel, BertConfig, BertTokenizer, Bert
                           AutoModelForSequenceClassification, AutoTokenizer, BertTokenizerFast,
                           get_scheduler)
 
-from utils import (construct_virtual_explanation, evaluate_tacred,
-                   load_explanation, replace_exp_with_random_tokens)
+from utils import (evaluate_tacred, evaluate_tacred, load_explanation)
 
 torch.set_printoptions(profile="full")
 
 logging.basicConfig(
-    filename='logs/expbert-{}.log'.format(str(datetime.now())),
+    filename='logs/corrputed-{}.log'.format(str(datetime.now())),
     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
     datefmt='%m/%d/%Y %H:%M:%S',
     level=logging.INFO)
@@ -109,7 +108,6 @@ class ExpBERT(nn.Module):
     def resize_token_embeddings(self, length):
         self.model.resize_token_embeddings(length)
 
-
 class REDataset(Dataset):
     def __init__(self, args, path, explanations, tokenizer):
         super(REDataset, self).__init__()
@@ -188,7 +186,7 @@ class REDataset(Dataset):
         #     for i in range(len(check_sentences1)):
         #         f.write(check_sentences1[i] + '\n')
 
-        outputs['labels'] = torch.tensor(labels)
+        outputs['labels'] = torch.tensor(labels) 
         return outputs
 
     def insert_entity(self, exp, entities):
@@ -358,6 +356,12 @@ class Trainer(object):
 
             explanations = replace_exp_with_random_tokens(copy.deepcopy(explanations), self.tokenizer, base_tokenizer_length, args.replace_ratio, args.replace_with_new_token)
 
+            logger.info("******************** Explanations ********************")
+            for exp in explanations:
+                logger.info(exp)
+            
+            logger.info("******************** Explanations ********************")
+
             # with open('check.txt', 'w') as f:
             #     for i, exp in enumerate(masked_explanations):
             #         f.write(exp + '\n')
@@ -459,7 +463,7 @@ class Trainer(object):
                 # torch.save(self.model.state_dict(), 'cache/{}/best_model_{}.pkl'.format(self.args.task, self.seed))
 
         logger.info('Evaluation Result on valid set: Accuracy: {} | F1-score: {}'.format(round(np.max(all_accuracy), 4), round(np.max(all_f1), 4)))
-
+        return np.max(all_f1)
 
 
         # predict on test set
@@ -535,7 +539,12 @@ if __name__ == "__main__":
     if args.task == 'tacred':
         args.shuffle = True
     # repeat experiment five times
-    for seed in range(12, 17):
+
+    results = []
+    for seed in range(12, 13):
         set_random_seed(seed)
         trainer = Trainer(args, seed)
-        trainer.train()
+        results.append(trainer.train())
+    
+    logger.info('Average F1-score: {}'.format(np.mean(results)))
+    logger.info('Std F1-score: {}'.format(np.std(results)))

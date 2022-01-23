@@ -1,6 +1,6 @@
-# for ratio in 0 0.5 1.0 # 0 0.25 0.5 0.75 1.0
+# for ratio in 0.25 0.75 # 0 0.5 1.0 # 0 0.25 0.5 0.75 1.0
 # do
-    # CUDA_VISIBLE_DEVICES=0 python analysis.py --explanation True --task disease --replace_ratio $ratio --batch_size 4 --gradient_accumulation_steps 8
+#     CUDA_VISIBLE_DEVICES=4 python analysis.py --explanation True --task disease --replace_ratio $ratio --batch_size 4 --gradient_accumulation_steps 8
 # done
 
 # for ratio in 0 0.5 1.0 # 0 0.25 0.5 0.75 1.0
@@ -11,7 +11,7 @@
 
 # for ratio in 0.05 0.1 0.2 0.4 # 0.6 0.8 1.0
 # do
-#     CUDA_VISIBLE_DEVICES=5 python num_analysis.py --task disease --ratio_train_samples $ratio # --explanation True
+#     CUDA_VISIBLE_DEVICES=0 python num_analysis.py --task disease --ratio_train_samples $ratio --explanation True --epochs 20
 # done
 
 # for ratio in 0.05 0.1 0.2 0.4
@@ -50,6 +50,18 @@
 # CUDA_VISIBLE_DEVICES=6 python freeze_analysis.py --task disease --batch_size 32 --learning_rate 1e-3 --explanation True --replace_ratio 0.5 --epochs 30 --dropout 0.0 --projection_dim 768 --hidden_dim 256 --num_layers 0
 # CUDA_VISIBLE_DEVICES=7 python freeze_analysis.py --task disease --batch_size 32 --learning_rate 1e-3 --explanation True --replace_ratio 1.0 --epochs 30 --dropout 0.0 --projection_dim 768 --hidden_dim 256 --num_layers 0
 
-# CUDA_VISIBLE_DEVICES=3 python run_re.py \
-#     --task disease \
-#     --batch_size 32
+CUDA_VISIBLE_DEVICES=0 python run_re.py \
+--task disease \
+--batch_size 32 \
+--explanation True 
+
+
+# for ratio in 0.05  #  0.1 0.2 0.4
+# do
+#     CUDA_VISIBLE_DEVICES=0 python random_num_analysis.py --explanation True --task disease --ratio_train_samples $ratio --batch_size 2 --gradient_accumulation_steps 16 --replace_ratio 1.0 --epochs 20
+# done
+
+# for ratio in 0.1  # 0.1 0.2 0.4
+# do
+    # CUDA_VISIBLE_DEVICES=3 python num_analysis.py --explanation True --task disease --ratio_train_samples $ratio --mannual_exp True --batch_size 2 --gradient_accumulation_steps 16 --epochs 10
+# done
