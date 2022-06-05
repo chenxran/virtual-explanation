@@ -1,0 +1,128 @@
+{e1} is the parent of {e2}
+{e1} and {e2} went to honeymoon
+{e1} is expecting a daughter with {e2}
+{e1} and {e2} are a couple
+{e1} is the ex-wife of {e2}
+{e1} and {e2} are siblings
+{e1} and {e2} have same parents
+{e1} was founded in the year of {e2}
+In {e2}, {e1} was founded
+{e1} began running since {e2}
+{e1} owns {e2}
+{e1} manages {e2}
+{e1} was born in {e2}
+The birthday of {e1} is {e2}
+{e1} is born in {e2}
+{e1} is founded in the city of {e2}
+{e1} runs business in {e2}
+The headquarter of {e1} is located in {e2}
+{e1} is {e2} years old
+{e1} was born {e2} years ago
+The age of {e1} is {e2}
+{e1} is charged for {e2}
+{e1} is guilty for {e2}
+{e1} was indicted because of {e2}
+{e1} lives in {e2} for a long time
+{e2} is the hometown of {e1}
+The residence of {e1} is {e2}
+{e1} was born in {e2}
+{e1} has nationality of {e2}
+{e1} is a citizen of {e2}
+{e1} lives in the state of {e2}
+{e1} is the citizen of the state of {e2}
+The state where {e1} lives in is {e2}
+The official website of {e1} is {e2}
+People could access {e1} through {e2}
+{e1} has registered a website {e2} on the Internet
+{e1} is the citizen of the city of {e2} 
+The city where {e1} lives in is {e2}
+{e1} is the parents of {e2}
+{e1} has parents
+Some one is married to {e2}
+{e1} is the employee of {e2}
+{e1} works for {e2}
+{e2} pays salary to {e1}
+{e1} was born in the city of {e2}
+{e1} is the citizen of the city of {e2}
+{e1} 's parents lived in {e2}
+{e1} is a member organization of {e2}
+{e1} is a subsidiary organiation of {e2}
+{e1} is controlled by {e2}
+{e1} is politically affiliated with {e2}
+The political tendency of {e1} is {e2}
+{e1} supports {e2} politically
+{e1} studies at {e2}
+The university {e1} attended to is {e2}
+{e1} is a student at {e2}
+{e1} died in the country of {e2}
+{e1} was buried in the country of {e2}
+{e1} 's cemetery is located in {e2}
+{e2} is the child of {e2}
+{e2} has parents
+{e1} has child
+{e2} is the top member of {e1}
+{e1} is owned by {e2}
+{e1} was dead in {e2}
+{e2} was the date when {e1} died.
+{e1} died in {e2}
+One of the member of {e1} is {e2}
+{e2} joins in {e1}
+{e2} is a member of {e1}
+{e1} is the abbreviation of {e2}
+People usually use {e1} to refer to {e2}
+{e1} is a alternate name of {e2}
+{e1} believes in {e2}
+The belief of {e1} is {e2}
+{e1} identifies himself as a {e2} in religion
+{e1} is a member of {e2}
+{e1} is included in {e2}
+{e1} died because of {e2}
+{e2} causes the death of {e1}
+{e2} is the main reason that {e1} died.
+{e1} identifies himself as a {e2} in origin
+{e1} is a {e2}
+{e1} origins from {e2}
+{e2} is a shareholder of {e1}
+{e2} owns stock of {e1}
+{e2} makes profits from {e1}
+{e1} was born in the state of {e2}
+{e2} is a place where {e1} was born
+The title of {e1} is {e2}
+{e1} is known as {e2}
+{e1} has title.
+The number of workers that {e1} has hired is {e2}
+{e2} workers work for {e1}
+{e1} consists of {e2} workers
+{e1} was bankrupt in {e2}
+{e1} ran out of money
+{e1} stop running since {e2}
+{e1} is located in the country of {e2}
+The headquarter of {e1} is set in the country of {e2}
+{e1} run business mainly in the country of {e2}
+{e1} is the borhter of {e2}
+{e1} grow up with {e2}
+{e1} is located in the state of {e2}
+The headquarter of {e1} is set in the state of {e2}
+{e1} run business mainly in the state of {e2}
+{e1} has a nickname {e2}
+People also call {e1} " {e2} "
+{e1} and {e2} refer to same person
+{e1} was married to {e2}
+{e1} and {e2} were couple
+{e2} was the husband of {e1}
+{e1} has another family before
+{e1} divorced before
+{e1} is a family member of {e2}
+{e1} died in the city of {e2}
+{e1} was buried in the city of {e2}
+{e1} was dead in the city of {e2}
+{e1} died in the state of {e2}
+{e1} was buried in the state of {e2}
+{e1} was dead in the state of {e2}
+{e1} was founded by {e2}
+{e2} owns {e1}
+{e2} is the leader of {e1}
+{e1} is a person
+{e1} is an organization
+{e2} is a person
+{e2} is an organization

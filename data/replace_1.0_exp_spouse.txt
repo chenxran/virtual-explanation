@@ -1,0 +1,41 @@
+{e1} <exp> <exp> <exp> {e2}
+{e1} <exp> {e2} <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp> <exp>
+{e1} <exp> <exp> <exp> {e2}
+{e1} <exp> {e2} <exp> <exp> <exp> <exp>
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> {e2} <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp> <exp> <exp> <exp>
+{e1} <exp> {e2}
+{e1} <exp> {e2} <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp>
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> {e2} <exp> <exp> <exp> <exp>
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> {e2} <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp> <exp>
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> {e2} <exp> <exp> <exp> <exp>
+{e1} <exp> <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp>
+{e2} <exp> <exp> <exp>
+{e1} <exp> <exp> <exp>
+{e2} <exp> <exp> <exp>
+<exp> <exp> <exp> <exp> {e1}
+<exp> <exp> <exp> <exp> {e2}
+{e1} <exp> <exp> <exp>
+{e2} <exp> <exp> <exp>
+{e1} <exp> {e2} <exp> <exp> <exp>

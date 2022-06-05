@@ -1,6 +1,7 @@
 logs/
+logs2/
 src/
 cache/
-data/
 .vscode/
 __pycache__/
+wandb/
