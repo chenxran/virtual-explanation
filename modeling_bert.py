@@ -224,6 +224,72 @@ class BertEmbeddings(nn.Module):
         return embeddings
 
 
+class BertFactorizedEmbeddings(nn.Module):
+    """Construct the embeddings from word, position and token_type embeddings."""
+
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+
+        self.factorized_ve_embedding = nn.Parameter(torch.randn(config.num_explanation_tokens, config.factorized_dim))
+        self.factorized_layer = nn.Linear(config.factorized_dim, config.hidden_size)
+        # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
+        # any TensorFlow checkpoint file
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        # position_ids (1, len position emb) is contiguous in memory and exported when serialized
+        self.position_embedding_type = getattr(config, "position_embedding_type", "absolute")
+        self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
+        if version.parse(torch.__version__) > version.parse("1.6.0"):
+            self.register_buffer(
+                "token_type_ids",
+                torch.zeros(self.position_ids.size(), dtype=torch.long, device=self.position_ids.device),
+                persistent=False,
+            )
+
+    def forward(
+        self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None, past_key_values_length=0
+    ):
+        if input_ids is not None:
+            input_shape = input_ids.size()
+        else:
+            input_shape = inputs_embeds.size()[:-1]
+
+        seq_length = input_shape[1]
+
+        if position_ids is None:
+            position_ids = self.position_ids[:, past_key_values_length : seq_length + past_key_values_length]
+
+        # Setting the token_type_ids to the registered buffer in constructor where it is all zeros, which usually occurs
+        # when its auto-generated, registered buffer helps users when tracing the model without passing token_type_ids, solves
+        # issue #5664
+        if token_type_ids is None:
+            if hasattr(self, "token_type_ids"):
+                buffered_token_type_ids = self.token_type_ids[:, :seq_length]
+                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(input_shape[0], seq_length)
+                token_type_ids = buffered_token_type_ids_expanded
+            else:
+                token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=self.position_ids.device)
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
+            batch_size, max_seq_length, hidden_size = inputs_embeds.size()
+            inputs_embeds[input_ids >= self.config.base_tokenizer_length] = self.factorized_layer(self.factorized_ve_embedding).unsqueeze(0).repeat(input_ids.size(0), 1, 1).view(-1, hidden_size)
+            # self.factorized_layer(self.factorized_ve_embedding).view(batch_size, hidden_size, self.config.num_explanation_tokens).transpose(1, 2).contiguous().view(-1, hidden_size)  # [batch_size, hidden_size * config.num_explanation_tokens] -> [batch_size, config.num_explanation_tokens, hidden_size]
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        embeddings = inputs_embeds + token_type_embeddings
+        if self.position_embedding_type == "absolute":
+            position_embeddings = self.position_embeddings(position_ids)
+            embeddings += position_embeddings
+        embeddings = self.LayerNorm(embeddings)
+        embeddings = self.dropout(embeddings)
+        return embeddings
+
+
 class BertSelfAttention(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -458,7 +524,9 @@ class BertLayer(nn.Module):
     def forward(
         self,
         hidden_states,
+        input_ids=None,
         attention_mask=None,
+        token_type_ids=None,
         head_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
@@ -524,17 +592,136 @@ class BertLayer(nn.Module):
         return layer_output
 
 
+class BertDenseLayer(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.chunk_size_feed_forward = config.chunk_size_feed_forward
+        self.seq_len_dim = 1
+        self.attention = BertAttention(config)
+        self.is_decoder = config.is_decoder
+        self.add_cross_attention = config.add_cross_attention
+        if self.add_cross_attention:
+            assert self.is_decoder, f"{self} should be used as a decoder model if cross attention is added"
+            self.crossattention = BertAttention(config)
+        self.intermediate = BertIntermediate(config)
+        self.output = BertOutput(config)
+
+        if config.exp_type == "dense":
+            self.mlp = nn.Sequential(
+                nn.Linear(config.hidden_size, config.hidden_size),
+                nn.ReLU(),
+                nn.Linear(config.hidden_size, config.hidden_size * config.num_explanation_tokens)
+            )
+        elif config.exp_type == "factorized_dense":
+            self.mlp = nn.Sequential(
+                nn.Linear(config.hidden_size, int(config.hidden_size / 4)),
+                nn.ReLU(),
+                nn.Linear(int(config.hidden_size / 4), config.hidden_size * config.num_explanation_tokens)     
+            )
+        else:
+            raise NotImplementedError
+
+    def calculate_dense(self, hidden_states, input_ids, attention_mask, token_type_ids):
+        batch_size, max_seq_length, hidden_size = hidden_states.size()
+
+        mask = ((token_type_ids == 0) * (attention_mask.squeeze() == 0)).float()   # [batch_size, max_seq_length]
+        inputs = (hidden_states * mask.unsqueeze(dim=2)).sum(1) / mask.sum(1).unsqueeze(1)  # [batch_size, hidden_size]
+
+        # [batch_size, hidden_size * config.num_explanation_tokens] -> [batch_size, config.num_explanation_tokens, hidden_size]
+        hidden_states[input_ids >= self.config.base_tokenizer_length] = self.mlp(inputs).view(batch_size, hidden_size, self.config.num_explanation_tokens).transpose(1, 2).contiguous().view(-1, hidden_size)
+        
+        return hidden_states
+
+
+    def forward(
+        self,
+        hidden_states,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        head_mask=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        past_key_value=None,
+        output_attentions=False,
+    ):
+        hidden_states = self.calculate_dense(hidden_states, input_ids, attention_mask, token_type_ids)
+        # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
+        self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
+        self_attention_outputs = self.attention(
+            hidden_states,
+            attention_mask,
+            head_mask,
+            output_attentions=output_attentions,
+            past_key_value=self_attn_past_key_value,
+        )
+        attention_output = self_attention_outputs[0]
+
+        # if decoder, the last output is tuple of self-attn cache
+        if self.is_decoder:
+            outputs = self_attention_outputs[1:-1]
+            present_key_value = self_attention_outputs[-1]
+        else:
+            outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
+
+        cross_attn_present_key_value = None
+        if self.is_decoder and encoder_hidden_states is not None:
+            assert hasattr(
+                self, "crossattention"
+            ), f"If `encoder_hidden_states` are passed, {self} has to be instantiated with cross-attention layers by setting `config.add_cross_attention=True`"
+
+            # cross_attn cached key/values tuple is at positions 3,4 of past_key_value tuple
+            cross_attn_past_key_value = past_key_value[-2:] if past_key_value is not None else None
+            cross_attention_outputs = self.crossattention(
+                attention_output,
+                attention_mask,
+                head_mask,
+                encoder_hidden_states,
+                encoder_attention_mask,
+                cross_attn_past_key_value,
+                output_attentions,
+            )
+            attention_output = cross_attention_outputs[0]
+            outputs = outputs + cross_attention_outputs[1:-1]  # add cross attentions if we output attention weights
+
+            # add cross-attn cache to positions 3,4 of present_key_value tuple
+            cross_attn_present_key_value = cross_attention_outputs[-1]
+            present_key_value = present_key_value + cross_attn_present_key_value
+
+        layer_output = apply_chunking_to_forward(
+            self.feed_forward_chunk, self.chunk_size_feed_forward, self.seq_len_dim, attention_output
+        )
+        outputs = (layer_output,) + outputs
+
+        # if decoder, return the attn key/values as the last output
+        if self.is_decoder:
+            outputs = outputs + (present_key_value,)
+
+        return outputs
+
+    def feed_forward_chunk(self, attention_output):
+        intermediate_output = self.intermediate(attention_output)
+        layer_output = self.output(intermediate_output, attention_output)
+        return layer_output
+
+
 class BertEncoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.layer = nn.ModuleList([BertLayer(config) for _ in range(config.num_hidden_layers)])
+        if config.exp_type == "dense" or config.exp_type == "factorized_dense":
+            self.layer = nn.ModuleList([BertDenseLayer(config) for _ in range(config.num_hidden_layers)])
+        else:
+            self.layer = nn.ModuleList([BertLayer(config) for _ in range(config.num_hidden_layers)])
         self.gradient_checkpointing = False
 
     def forward(
         self,
         hidden_states,
+        input_ids,
         attention_mask=None,
+        token_type_ids=None,
         head_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
@@ -581,7 +768,9 @@ class BertEncoder(nn.Module):
             else:
                 layer_outputs = layer_module(
                     hidden_states,
+                    input_ids,
                     attention_mask,
+                    token_type_ids,
                     layer_head_mask,
                     encoder_hidden_states,
                     encoder_attention_mask,
@@ -862,7 +1051,10 @@ class BertModel(BertPreTrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.embeddings = BertEmbeddings(config)
+        if config.exp_type == "factorized_random":
+            self.embeddings = BertFactorizedEmbeddings(config)
+        else:
+            self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
 
         self.pooler = BertPooler(config) if add_pooling_layer else None
@@ -994,7 +1186,9 @@ class BertModel(BertPreTrainedModel):
         )
         encoder_outputs = self.encoder(
             embedding_output,
+            input_ids=input_ids,
             attention_mask=extended_attention_mask,
+            token_type_ids=token_type_ids,
             head_mask=head_mask,
             encoder_hidden_states=encoder_hidden_states,
             encoder_attention_mask=encoder_extended_attention_mask,

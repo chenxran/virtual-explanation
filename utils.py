@@ -12,11 +12,12 @@ from datasets import DatasetDict, Dataset
 def construct_virtual_explanation(exp_num=10, num_explanation_tokens=4):
     texts = []
     for i in range(exp_num):
-        a = ' '.join(["[explanation{}]".format(j) for j in range(3 * i * num_explanation_tokens, (3 * i + 1) * num_explanation_tokens)])
+        a = ' '.join(["[explanation{}]".format(j) for j in range(i * num_explanation_tokens, (i + 1) * num_explanation_tokens)])
+        # a = ' '.join(["[explanation{}]".format(j) for j in range(3 * i * num_explanation_tokens, (3 * i + 1) * num_explanation_tokens)])
         # b = ' '.join(["[explanation{}]".format(j) for j in range((3 * i + 1) * num_explanation_tokens, (3 * i + 2) * num_explanation_tokens)])
         # c = ' '.join(["[explanation{}]".format(j) for j in range((3 * i + 2) * num_explanation_tokens, (3 * i + 3) * num_explanation_tokens)])
         # texts.append(' <mask> '.join([a, b, c]))
-        texts.append('<mask> {} <mask>'.format(a))
+        texts.append('<mask> {} <mask>.'.format(a))
     return texts
 
 
